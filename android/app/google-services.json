@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "662279003599",
+    "project_id": "app-cotizaciones-b25ac",
+    "storage_bucket": "app-cotizaciones-b25ac.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:662279003599:android:d405ea3af8ef960ce706ba",
+        "android_client_info": {
+          "package_name": "com.example.desarrollo_movil"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCSvuzFCYsSC5FSWhm_mMoAPbitj9Nhavc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
