@@ -1,0 +1,19 @@
+from dataclasses import dataclass
+from typing import Optional
+from datetime import datetime
+
+
+@dataclass
+class UserEntity:
+    id: Optional[int]
+    username: str
+    email: str
+    first_name: str = ""
+    last_name: str = ""
+    is_active: bool = True
+    is_staff: bool = False
+    date_joined: Optional[datetime] = None
+
+    @property
+    def full_name(self) -> str:
+        return f"{self.first_name} {self.last_name}".strip() or self.username

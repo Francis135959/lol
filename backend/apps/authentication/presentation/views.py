@@ -1,0 +1,120 @@
+from rest_framework.views import APIView
+from rest_framework import status
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.authtoken.models import Token
+from django.contrib.auth import get_user_model
+
+from apps.core.presentation.responses import success_response, error_response
+from apps.authentication.domain.exceptions import (
+    AuthException,
+    InvalidCredentialsException,
+    UserAlreadyExistsException,
+    UserNotFoundException,
+)
+from apps.authentication.application.use_cases import (
+    RegisterUserUseCase,
+    RegisterUserDTO,
+    LoginUseCase,
+)
+from apps.authentication.infrastructure.repositories import DjangoUserRepository
+from .serializers import (
+    RegisterRequestSerializer,
+    LoginRequestSerializer,
+    UserResponseSerializer,
+)
+
+UserModel = get_user_model()
+
+AUTH_ERROR_CODES = {
+    UserAlreadyExistsException: "USUARIO_YA_EXISTE",
+    InvalidCredentialsException: "CREDENCIALES_INVALIDAS",
+    UserNotFoundException: "USUARIO_NO_ENCONTRADO",
+}
+
+
+def _auth_error_code(err: AuthException) -> str:
+    return AUTH_ERROR_CODES.get(type(err), "ERROR_AUTENTICACION")
+
+
+class RegisterAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = RegisterRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        dto = RegisterUserDTO(**serializer.validated_data)
+        use_case = RegisterUserUseCase(DjangoUserRepository())
+
+        try:
+            user_entity = use_case.execute(dto)
+            django_user = UserModel.objects.get(pk=user_entity.id)
+            token, _ = Token.objects.get_or_create(user=django_user)
+
+            return success_response(
+                data={
+                    "user": UserResponseSerializer(user_entity).data,
+                    "token": token.key,
+                },
+                mensaje="Usuario registrado exitosamente",
+                status=status.HTTP_201_CREATED,
+            )
+        except AuthException as err:
+            return error_response(
+                mensaje=str(err),
+                codigo=_auth_error_code(err),
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+
+class LoginAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = LoginRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        use_case = LoginUseCase(DjangoUserRepository())
+
+        try:
+            user_entity = use_case.execute(
+                username_or_email=serializer.validated_data['username'],
+                password=serializer.validated_data['password'],
+            )
+            django_user = UserModel.objects.get(pk=user_entity.id)
+            token, _ = Token.objects.get_or_create(user=django_user)
+
+            return success_response(
+                data={
+                    "user": UserResponseSerializer(user_entity).data,
+                    "token": token.key,
+                },
+                mensaje="Inicio de sesión exitoso",
+                status=status.HTTP_200_OK,
+            )
+        except AuthException as err:
+            return error_response(
+                mensaje=str(err),
+                codigo=_auth_error_code(err),
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+
+class MeAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        repo = DjangoUserRepository()
+        user_entity = repo.get_by_id(request.user.id)
+        if not user_entity:
+            return error_response(
+                mensaje="Usuario no encontrado",
+                codigo="USUARIO_NO_ENCONTRADO",
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        return success_response(
+            data=UserResponseSerializer(user_entity).data,
+            mensaje="Usuario obtenido correctamente",
+            status=status.HTTP_200_OK,
+        )
